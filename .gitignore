@@ -1,0 +1,7 @@
+# File hệ thống của Windows / macOS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# File tạm Word tạo ra khi đang mở tài liệu
+~$*
