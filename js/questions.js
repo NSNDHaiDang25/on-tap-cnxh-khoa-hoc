@@ -24,17 +24,18 @@
          { text: "Phát biểu thứ hai", answer: "Sai" }
        ] },
 
-   chapter là số bài (1–6, khớp với CHAPTERS). Có thể thêm
+   chapter là số bài (1–6, khớp với CHAPTERS; "short" là tên ngắn hiện trên
+   thẻ ở trang chủ). Có thể thêm
    explanation: "Giải thích…" vào bất kỳ câu nào.
    ========================================================================== */
 
 window.CHAPTERS = [
-  { id: 1, title: "Nhập môn CNXH khoa học và sứ mệnh lịch sử của giai cấp công nhân" },
-  { id: 2, title: "Chủ nghĩa xã hội và thời kỳ quá độ lên chủ nghĩa xã hội" },
-  { id: 3, title: "Dân chủ xã hội chủ nghĩa và Nhà nước xã hội chủ nghĩa" },
-  { id: 4, title: "Cơ cấu xã hội – giai cấp và liên minh giai cấp, tầng lớp trong thời kỳ quá độ" },
-  { id: 5, title: "Vấn đề dân tộc và tôn giáo trong thời kỳ quá độ lên CNXH" },
-  { id: 6, title: "Vấn đề gia đình trong thời kỳ quá độ lên CNXH" }
+  { id: 1, title: "Nhập môn CNXH khoa học và sứ mệnh lịch sử của giai cấp công nhân", short: "Sứ mệnh GCCN" },
+  { id: 2, title: "Chủ nghĩa xã hội và thời kỳ quá độ lên chủ nghĩa xã hội", short: "Thời kỳ quá độ" },
+  { id: 3, title: "Dân chủ xã hội chủ nghĩa và Nhà nước xã hội chủ nghĩa", short: "Dân chủ & Nhà nước" },
+  { id: 4, title: "Cơ cấu xã hội – giai cấp và liên minh giai cấp, tầng lớp trong thời kỳ quá độ", short: "Cơ cấu giai cấp" },
+  { id: 5, title: "Vấn đề dân tộc và tôn giáo trong thời kỳ quá độ lên CNXH", short: "Dân tộc & tôn giáo" },
+  { id: 6, title: "Vấn đề gia đình trong thời kỳ quá độ lên CNXH", short: "Gia đình" }
 ];
 
 window.QUESTION_BANK = [

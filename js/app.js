@@ -124,12 +124,8 @@
     chevR: '<path d="m9 18 6-6-6-6"/>',
     grid: '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
     book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
-    list: '<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
     rotate: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
-    award: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>',
     file: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>',
-    history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
-    target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
     bulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
     eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
     upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
@@ -149,6 +145,7 @@
     history: 'cnxhkh_history_v1', // lịch sử làm bài
     stats: 'cnxhkh_stats_v1',     // tỉ lệ đúng theo bài
     wrong: 'cnxhkh_wrong_v1',     // sổ câu sai
+    seen: 'cnxhkh_seen_v1',       // các câu đã từng trả lời
     session: 'cnxhkh_session_v1', // bài đang làm dở
     last: 'cnxhkh_last_v1',       // kết quả gần nhất
     prefs: 'cnxhkh_prefs_v1',     // tùy chọn thiết lập
@@ -205,7 +202,7 @@
 
   /* ======================= 3. NGÂN HÀNG CÂU HỎI ======================= */
   const CHAPTERS = (Array.isArray(window.CHAPTERS) ? window.CHAPTERS : [])
-    .map((c) => ({ id: Number(c.id) || 0, title: String(c.title || '') }));
+    .map((c) => ({ id: Number(c.id) || 0, title: String(c.title || ''), short: String(c.short || '') }));
 
   let BANK = [];            // danh sách câu hỏi đã chuẩn hóa
   let BY_UID = new Map();   // tra cứu nhanh theo mã
@@ -290,7 +287,7 @@
   function chapterList() {
     const counts = new Map();
     BANK.forEach((q) => counts.set(q.chapter, (counts.get(q.chapter) || 0) + 1));
-    const list = CHAPTERS.map((c) => ({ id: c.id, title: c.title, count: counts.get(c.id) || 0 }));
+    const list = CHAPTERS.map((c) => ({ id: c.id, title: c.title, short: c.short, count: counts.get(c.id) || 0 }));
     counts.forEach((n, id) => {
       if (!list.some((c) => c.id === id)) {
         list.push({ id, title: id ? `Bài ${id}` : 'Câu hỏi chưa phân bài', count: n });
@@ -411,6 +408,19 @@
     return Object.keys(wb || {}).filter((uid) => BY_UID.has(uid));
   }
 
+  /* Các câu đã từng trả lời — lần đầu chưa có dữ liệu thì lấy từ sổ câu sai và bài làm gần nhất */
+  function loadSeen() {
+    let seen = store.get(KEYS.seen, null);
+    if (!seen || typeof seen !== 'object') {
+      seen = {};
+      Object.keys(store.get(KEYS.wrong, {}) || {}).forEach((uid) => { seen[uid] = 1; });
+      if (LAST) LAST.items.forEach((x) => { if (!x.skipped) seen[x.uid] = 1; });
+      store.set(KEYS.seen, seen);
+    }
+    return seen;
+  }
+  const seenUids = () => Object.keys(loadSeen()).filter((uid) => BY_UID.has(uid));
+
   /* ======================= 4. ĐIỀU HƯỚNG ======================= */
   const VIEWS = ['home', 'setup', 'quiz', 'result', 'review', 'search', 'import'];
   const TITLES = {
@@ -450,6 +460,7 @@
       a.classList.toggle('active', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
+    $$('[data-nav="setup"]').forEach((a) => a.classList.toggle('has-dot', !!S && name !== 'quiz'));
     document.body.classList.toggle('in-quiz', name === 'quiz');
     document.title = name === 'home' ? TITLES.home : `${TITLES[name]} · CNXH Khoa học`;
     if (changed) window.scrollTo(0, 0);
@@ -483,15 +494,107 @@
     });
   }
 
+  /* Ngôi sao vàng trong vòng chấm tròn, kèm vài tia lấp lánh */
+  const SPARK = (x, y, s, k) => `<path class="spark ${k}" d="M${x} ${y - s}Q${x} ${y} ${x + s} ${y}Q${x} ${y} ${x} ${y + s}Q${x} ${y} ${x - s} ${y}Q${x} ${y} ${x} ${y - s}Z"/>`;
   const HERO_ART = `
-    <svg viewBox="0 0 240 240">
-      <g class="spin"><circle class="orbit" cx="120" cy="120" r="106"/><circle class="dot" cx="226" cy="120" r="5"/></g>
-      <g class="spin s2"><circle class="orbit" cx="120" cy="120" r="82"/><circle class="dot" cx="38" cy="120" r="3.5"/></g>
-      <path class="star" d="M120 52 L135.9 98.2 L184.7 99 L145.7 128.3 L160 175 L120 147 L80 175 L94.3 128.3 L55.3 99 L104.1 98.2 Z"/>
+    <svg viewBox="0 0 200 200">
+      <circle class="halo" cx="100" cy="100" r="84"/>
+      <g class="spin"><circle class="orbit" cx="100" cy="100" r="72"/><circle class="orbit-dot" cx="172" cy="100" r="4"/><circle class="orbit-dot" cx="28" cy="100" r="2.5"/></g>
+      <g class="star-wrap">
+        <path class="star" d="M100 52L112.3 83L145.7 85.2L120 106.5L128.2 138.8L100 121L71.8 138.8L80 106.5L54.3 85.2L87.7 83Z"/>
+        <path class="star-hi" d="M100 52L87.7 83L54.3 85.2L80 106.5L71.8 138.8L100 121Z"/>
+      </g>
+      ${SPARK(34, 46, 9, 'k1')}${SPARK(170, 38, 6, 'k2')}${SPARK(168, 160, 10, 'k3')}${SPARK(30, 158, 5, 'k2')}
     </svg>`;
 
-  function statTile(label, value, ic) {
-    return `<div class="stat"><span class="stat-icon">${icon(ic)}</span><div><b>${value}</b><span>${label}</span></div></div>`;
+  /* Icon minh họa hai màu cho các thẻ ở trang chủ (khung 24×24) */
+  const ART = {
+    gear: '<path class="f-honey" d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle class="f-paper" cx="12" cy="12" r="3"/>',
+    flag: '<path class="f-rust" d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
+    landmark: '<path class="f-honey" d="M11.12 2.2a2 2 0 0 1 1.76 0l7.87 3.85c.47.23.31.95-.22.95H3.47c-.53 0-.69-.72-.22-.95z"/><path d="M6 18v-7M10 18v-7M14 18v-7M18 18v-7"/><rect class="f-sky" x="3" y="18" width="18" height="4" rx="1"/>',
+    users: '<path class="f-sky" d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2z"/><circle class="f-honey" cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    globe: '<circle class="f-sky" cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/>',
+    house: '<path class="f-honey" d="M3 10a2 2 0 0 1 .71-1.53l7-6a2 2 0 0 1 2.58 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path class="f-rust" d="M12 18.5s-4-2.3-4-5a2 2 0 0 1 4-.8 2 2 0 0 1 4 .8c0 2.7-4 5-4 5z"/>',
+    book: '<path class="f-honey" d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path class="f-sky" d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+    target: '<circle class="f-peach" cx="12" cy="12" r="10"/><circle class="f-paper" cx="12" cy="12" r="6"/><circle class="f-rust" cx="12" cy="12" r="2"/>',
+    timer: '<circle class="f-sky" cx="12" cy="14" r="8"/><path d="M10 2h4M12 14l3-3M19 6l1.5-1.5"/>'
+  };
+  const art = (name) => `<svg class="art tile-art" viewBox="0 0 24 24" aria-hidden="true">${ART[name] || ART.book}</svg>`;
+  const CHAPTER_ART = { 1: 'gear', 2: 'flag', 3: 'landmark', 4: 'users', 5: 'globe', 6: 'house' };
+  const PAW = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="10" r="2.2"/><circle cx="10" cy="6" r="2.2"/><circle cx="14" cy="6" r="2.2"/><circle cx="17.5" cy="10" r="2.2"/><path d="M12 11c-3 0-6 3.6-6 6.2 0 1.6 1.2 2.3 2.6 2.3 1.3 0 2.2-.6 3.4-.6s2.1.6 3.4.6c1.4 0 2.6-.7 2.6-2.3C18 14.6 15 11 12 11z"/></svg>';
+
+  /* Vòng tròn tiến độ: phần xanh là pct%, phần vàng là phần còn lại, cách nhau một khe nhỏ */
+  function donut(pct, center, label, meta, empty) {
+    const GAP = 1.6;
+    const p = Math.max(0, Math.min(100, pct));
+    const v = p >= 100 ? 100 : p > 0 ? Math.max(p - GAP, .5) : 0;
+    const rest = empty ? '' : p >= 100 ? ''
+      : `<circle class="d-rest" cx="60" cy="60" r="50" pathLength="100" stroke-dasharray="${p > 0 ? 100 - p - GAP : 100} 100" stroke-dashoffset="${-p}"/>`;
+    return `
+      <div class="card donut-card">
+        <div class="donut" style="--v:${v}">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            ${empty ? '<circle class="d-empty" cx="60" cy="60" r="50"/>' : ''}${rest}
+            ${v ? '<circle class="d-value" cx="60" cy="60" r="50" pathLength="100"/>' : ''}
+          </svg>
+          <div class="donut-center">${center}</div>
+        </div>
+        <p class="donut-label">${label}</p>
+        <p class="donut-meta">${meta}</p>
+      </div>`;
+  }
+
+  /* Một thẻ trong lưới: icon, tên, dòng phụ và nút viên thuốc (màu nút xen kẽ do CSS đảm nhận) */
+  function tile(t, i) {
+    const inner = `${art(t.art)}<span class="tile-kicker">${t.kicker}</span><span class="tile-name">${t.name}</span><span class="tile-meta">${t.meta}</span>`;
+    const main = t.mainAction
+      ? `<button type="button" class="tile-main" data-action="${t.mainAction}" ${t.data || ''} title="${t.title}">${inner}</button>`
+      : `<div class="tile-main">${inner}</div>`;
+    return `
+      <article class="tile" style="--i:${i}">
+        ${main}
+        <button type="button" class="pill" data-action="${t.action}" ${t.data || ''} aria-label="${t.aria}" ${t.disabled ? 'disabled' : ''}>${t.pill}</button>
+      </article>`;
+  }
+
+  /* Dòng thời gian: các lượt làm bài gần nhất, hoặc lộ trình gợi ý khi chưa làm bài nào */
+  function timelineNode(n) {
+    const top = n.gap ? '<span class="tl-gap" aria-hidden="true">•••</span>'
+      : n.action ? `<button type="button" class="tl-pill" data-action="${n.action}">${n.pill}</button>`
+      : `<span class="tl-pill">${n.pill}</span>`;
+    return `
+      <li class="tl-node ${n.tone || ''}"${n.title ? ` title="${n.title}"` : ''}>
+        <div class="tl-top">${top}</div>
+        <span class="tl-dot" aria-hidden="true"></span>
+        <span class="tl-label">${n.label}${n.sub ? `<small>${n.sub}</small>` : ''}</span>
+      </li>`;
+  }
+
+  function timelineHtml(hist) {
+    const TONE = { good: 'sky', mid: 'honey', low: 'rust' };
+    const today = new Date().toDateString();
+    const when = (ts) => {
+      const d = new Date(ts);
+      return d.toDateString() === today ? 'Hôm nay' : `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
+    };
+    const nodes = hist.length
+      ? hist.slice(0, 4).reverse().map((h) => ({
+          tone: TONE[scoreTone(h.score10)],
+          pill: `${fmtScore(h.score10)} điểm<small>${h.mode === 'exam' ? 'Thi thử' : 'Luyện tập'}</small>`,
+          label: when(h.t),
+          sub: `${h.correct}/${h.total} câu`,
+          title: esc(`${fmtDate(h.t)} · ${fmtTime(h.duration)}${h.label ? ' · ' + h.label : ''}`)
+        })).concat({ tone: 'next', pill: `${icon('plus')} Làm bài`, action: 'open-setup', label: 'Lượt tiếp theo' })
+      : [
+          { tone: 'sky', pill: 'Bắt đầu', label: 'Chọn bài học' },
+          { tone: 'sky', gap: true, label: 'Luyện 10 câu' },
+          { tone: 'honey', pill: 'Củng cố', label: 'Ôn câu sai' },
+          { tone: 'honey', gap: true, label: 'Thi thử' },
+          { tone: 'honey', pill: 'Về đích', label: 'Xem lại đáp án' }
+        ];
+    return `
+      <ol class="tl" style="--n:${nodes.length}">${nodes.map(timelineNode).join('')}</ol>
+      ${hist.length ? '' : '<p class="journey-note">Hoàn thành lượt làm bài đầu tiên để lưu lại hành trình của bạn tại đây.</p>'}`;
   }
 
   function scoreTone(score) { return score >= 8 ? 'good' : score >= 5 ? 'mid' : 'low'; }
@@ -524,48 +627,54 @@
     const best = hist.length ? Math.max.apply(null, hist.map((h) => h.score10 || 0)) : null;
     const stats = store.get(KEYS.stats, {}) || {};
     const wrong = wrongBookUids().length;
+    const seen = seenUids().length;
 
-    const chapterCards = chapters.map((c, i) => {
+    let right = 0, answered = 0;
+    Object.keys(stats).forEach((k) => {
+      right += Number(stats[k] && stats[k].c) || 0;
+      answered += Number(stats[k] && stats[k].t) || 0;
+    });
+    const coverage = BANK.length ? Math.round((seen / BANK.length) * 100) : 0;
+    const accuracy = answered ? Math.round((right / answered) * 100) : 0;
+
+    const today = new Date().toDateString();
+    const todayCount = hist.filter((h) => new Date(h.t).toDateString() === today).reduce((n, h) => n + (h.total || 0), 0);
+
+    const tiles = chapters.map((c) => {
       const s = stats[c.id];
-      const pct = s && s.t ? Math.round((s.c / s.t) * 100) : 0;
-      return `
-        <article class="chapter-card" style="--i:${i}">
-          <div class="chapter-top">
-            <span class="chapter-no">${c.id ? pad2(c.id) : '—'}</span>
-            <span class="chip">${c.count} câu</span>
-          </div>
-          <h3>${esc(c.title)}</h3>
-          <div class="mastery">
-            <div class="progress"><span style="width:${pct}%"></span></div>
-            <small>${s && s.t ? `Tỉ lệ đúng ${pct}% (${s.c}/${s.t} lượt trả lời)` : 'Chưa luyện tập'}</small>
-          </div>
-          <div class="chapter-actions">
-            <button type="button" class="btn btn-sm btn-ghost" data-action="chapter-setup" data-ch="${c.id}" ${c.count ? '' : 'disabled'}>Tùy chỉnh</button>
-            <button type="button" class="btn btn-sm btn-soft" data-action="chapter-quick" data-ch="${c.id}" ${c.count ? '' : 'disabled'}>${icon('play')} Luyện 10 câu</button>
-          </div>
-        </article>`;
-    }).join('');
-
-    const historyHtml = hist.length
-      ? `<ul class="history-list">${hist.slice(0, 5).map((h) => `
-          <li>
-            <span class="h-score ${scoreTone(h.score10)}">${fmtScore(h.score10)}</span>
-            <div>
-              <b>${h.mode === 'exam' ? 'Thi thử' : 'Luyện tập'} · đúng ${h.correct}/${h.total} câu</b>
-              <small>${fmtDate(h.t)} · ${fmtTime(h.duration)}${h.label ? ' · ' + esc(h.label) : ''}</small>
-            </div>
-          </li>`).join('')}</ul>`
-      : `<p class="muted">Chưa có lượt làm bài nào. Hãy bắt đầu bài đầu tiên!</p>`;
+      const label = chapterLabel(c.id);
+      return {
+        art: CHAPTER_ART[c.id] || 'book',
+        kicker: label,
+        name: esc(c.short || c.title),
+        meta: `${c.count} câu${s && s.t ? ` · ${Math.round((s.c / s.t) * 100)}%` : ''}`,
+        mainAction: 'chapter-setup',
+        title: esc(`Tùy chỉnh bài làm ${label}: ${c.title}`),
+        action: 'chapter-quick', data: `data-ch="${c.id}"`,
+        pill: 'Luyện', aria: esc(`Luyện nhanh 10 câu ${label}: ${c.title}`),
+        disabled: !c.count
+      };
+    }).concat([
+      {
+        art: 'target', kicker: 'Ôn lại', name: 'Sổ câu sai',
+        meta: `${wrong} câu`,
+        action: 'practice-wrongbook', pill: 'Ôn lại', aria: 'Ôn lại các câu từng làm sai', disabled: !wrong
+      },
+      {
+        art: 'timer', kicker: 'Thử sức', name: 'Thi thử',
+        meta: 'Có bấm giờ',
+        action: 'open-exam', pill: 'Vào thi', aria: 'Thiết lập bài thi thử', disabled: !BANK.length
+      }
+    ]);
 
     $('#view-home').innerHTML = `
       <section class="hero">
         <div class="hero-copy">
-          <span class="eyebrow">${icon('book')} Học phần Lý luận chính trị</span>
-          <h1 class="hero-title">Chủ nghĩa xã hội <span>khoa học</span></h1>
-          <p class="hero-lead">Ôn tập trắc nghiệm theo ${CHAPTERS.length || chapters.length} bài học: luyện tập có giải thích ngay, thi thử có đồng hồ đếm ngược, xem lại đáp án chi tiết và tra cứu nhanh mọi câu hỏi.</p>
+          <h1 class="hero-title">Chủ nghĩa xã hội khoa học</h1>
+          <p class="hero-lead">Ôn tập trắc nghiệm theo ${CHAPTERS.length || chapters.length} bài học — luyện tập có giải thích ngay, thi thử có bấm giờ và tra cứu nhanh mọi câu hỏi.</p>
           <div class="hero-actions">
-            <button type="button" class="btn btn-primary btn-lg" data-action="open-setup">${icon('play')} Bắt đầu làm bài</button>
-            <button type="button" class="btn btn-ghost btn-lg" data-action="scroll-chapters">${icon('list')} Ôn tập theo bài</button>
+            <button type="button" class="btn btn-outline" data-action="scroll-chapters">Ôn theo bài</button>
+            <button type="button" class="btn btn-primary" data-action="open-practice">Luyện tập</button>
           </div>
         </div>
         <div class="hero-art" aria-hidden="true">${HERO_ART}</div>
@@ -574,50 +683,44 @@
       ${resumeCard()}
       ${BANK.length ? '' : `<div class="card resume"><div class="resume-icon">${icon('alert')}</div><div class="resume-body"><b>Chưa có câu hỏi nào</b><p>Kiểm tra lại file <code>js/questions.js</code> hoặc vào mục “Thêm câu hỏi”.</p></div></div>`}
 
-      <section class="stat-grid" aria-label="Thống kê">
-        ${statTile('Câu hỏi', BANK.length, 'file')}
-        ${statTile('Bài học', chapters.length, 'book')}
-        ${statTile('Lượt làm bài', hist.length, 'history')}
-        ${statTile('Điểm cao nhất', best == null ? '—' : fmtScore(best), 'award')}
+      <section class="section" aria-labelledby="progress-title">
+        <div class="section-head"><h2 id="progress-title">Tiến độ</h2></div>
+        <div class="donut-row">
+          ${donut(coverage, `${coverage}%`, 'Câu hỏi đã luyện', `${seen}/${BANK.length} câu`, !BANK.length)}
+          ${donut(accuracy, answered ? `${accuracy}%` : '—', 'Tỉ lệ trả lời đúng',
+            answered ? `${right}/${answered} lượt trả lời` : 'Chưa trả lời câu nào', !answered)}
+        </div>
+        <div class="tile-grid" id="chapters">${tiles.map(tile).join('')}</div>
       </section>
 
-      <section class="section" id="chapters">
-        <div class="section-head">
-          <h2>Ôn tập theo bài</h2>
-          <p>Luyện nhanh 10 câu ngẫu nhiên, hoặc tùy chỉnh số câu và chế độ.</p>
-        </div>
-        <div class="chapter-grid">${chapterCards}</div>
-      </section>
-
-      <section class="section" id="cats">
-        <div class="section-head">
-          <h2>Góc mèo</h2>
-          <p>Những người bạn nhỏ ôn bài cùng bạn — bấm vào ảnh để xem lớn.</p>
-        </div>
-        <div class="cat-strip">
-          ${CATS.map((c, i) => `
-            <button type="button" class="polaroid" style="--i:${i}" data-action="cat-view" data-i="${i}">
-              <img src="${c.src}" alt="" loading="lazy" style="object-position:${c.pos}">
-              <span>${esc(c.caption)}</span>
-            </button>`).join('')}
-        </div>
-      </section>
-
-      <section class="section two-col">
-        <div class="card wrongbook">
-          <div class="card-head">${icon('target')}<h2 class="card-title">Sổ câu sai</h2></div>
-          <div class="wrongbook-count">${wrong}</div>
-          <p>${wrong
-            ? 'câu bạn từng trả lời sai. Làm đúng câu nào, câu đó sẽ tự động được gạch khỏi sổ.'
-            : 'Chưa có câu sai nào được ghi nhận. Sau mỗi bài làm, các câu bạn hay nhầm sẽ được lưu vào đây.'}</p>
-          <button type="button" class="btn btn-soft" data-action="practice-wrongbook" ${wrong ? '' : 'disabled'}>${icon('rotate')} Ôn lại câu sai</button>
-        </div>
-        <div class="card">
-          <div class="card-head">${icon('history')}<h2 class="card-title">Lịch sử làm bài</h2><span class="spacer"></span>
-            ${hist.length ? `<button type="button" class="link-btn" data-action="clear-history">Xóa lịch sử</button>` : ''}
+      <section class="section" id="cats" aria-labelledby="cats-title">
+        <div class="section-head"><h2 id="cats-title">Góc mèo</h2></div>
+        <div class="pet-corner">
+          <p class="bubble b1"><span class="bubble-ic">${PAW}</span><span>${todayCount
+            ? `Hôm nay bạn đã làm <b>${todayCount}</b> câu rồi, giỏi quá!`
+            : 'Hôm nay học bài chưa? Làm 10 câu với tụi mình nhé!'}</span></p>
+          <div class="cat-strip">
+            ${CATS.map((c, i) => `
+              <button type="button" class="polaroid" style="--i:${i}" data-action="cat-view" data-i="${i}">
+                <img src="${c.src}" alt="" loading="lazy" style="object-position:${c.pos}">
+                <span>${esc(c.caption)}</span>
+              </button>`).join('')}
           </div>
-          ${historyHtml}
+          <p class="bubble b2"><span class="bubble-ic">${PAW}</span><span>${wrong
+            ? `Còn <b>${wrong}</b> câu sai đang chờ bạn ôn lại đó.`
+            : 'Học xong nhớ ghé xoa đầu tụi mình nha!'}</span></p>
         </div>
+      </section>
+
+      <section class="section" aria-labelledby="journey-title">
+        <div class="section-head">
+          <div>
+            <h2 id="journey-title">Hành trình ôn tập</h2>
+            ${hist.length ? `<p>${hist.length} lượt làm bài · cao nhất ${fmtScore(best)} điểm</p>` : ''}
+          </div>
+          ${hist.length ? `<button type="button" class="link-btn" data-action="clear-history">Xóa lịch sử</button>` : ''}
+        </div>
+        <div class="card journey">${timelineHtml(hist)}</div>
       </section>
 
       <section class="section card tips">
@@ -625,6 +728,14 @@
         <span><strong>Phím tắt khi làm bài:</strong> <kbd>1</kbd>–<kbd>4</kbd> hoặc <kbd>A</kbd>–<kbd>D</kbd> chọn đáp án ·
         <kbd>←</kbd> <kbd>→</kbd> chuyển câu · <kbd>F</kbd> đánh dấu câu cần xem lại · <kbd>Enter</kbd> câu tiếp theo.</span>
       </section>`;
+
+    // dòng thời gian dài hơn màn hình thì cuộn tới lượt mới nhất (bên phải)
+    const journey = $('#view-home .journey');
+    if (hist.length) journey.scrollLeft = journey.scrollWidth;
+    // vẽ vòng tiến độ sau khi trang đã hiện ra để có hiệu ứng chạy vòng
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      $$('#view-home .donut').forEach((d) => d.classList.add('go'));
+    }));
   }
 
   /* ======================= 6. THIẾT LẬP BÀI LÀM ======================= */
@@ -1284,13 +1395,16 @@
 
     const stats = store.get(KEYS.stats, {}) || {};
     const wb = store.get(KEYS.wrong, {}) || {};
+    const seen = loadSeen();
     items.forEach((x) => {
       const s = stats[x.chapter] || (stats[x.chapter] = { c: 0, t: 0 });
       s.t++;
+      if (!x.skipped) seen[x.uid] = 1;
       if (x.correct) { s.c++; delete wb[x.uid]; } else if (!x.skipped) wb[x.uid] = (wb[x.uid] || 0) + 1;
     });
     store.set(KEYS.stats, stats);
     store.set(KEYS.wrong, wb);
+    store.set(KEYS.seen, seen);
 
     clearSession();
     REVIEW_FILTER = 'all';
@@ -1963,7 +2077,7 @@
     btn.setAttribute('aria-label', label);
     btn.title = label;
     const meta = $('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#14100e' : '#f7f3ec');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#18120f' : '#fcf5ec');
   }
 
   function toggleTheme() {
@@ -1986,6 +2100,8 @@
   const ACTIONS = {
     'skip': () => $('#main').focus(),
     'open-setup': () => go('setup'),
+    'open-practice': () => { PREFS.mode = 'practice'; savePrefs(); go('setup'); },
+    'open-exam': () => { PREFS.mode = 'exam'; savePrefs(); go('setup'); },
     'scroll-chapters': () => {
       const el = $('#chapters');
       if (el) el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' });
@@ -2006,10 +2122,10 @@
     'clear-history': () => openModal({
       icon: 'trash',
       title: 'Xóa lịch sử làm bài?',
-      body: 'Lịch sử, điểm cao nhất và tỉ lệ đúng theo bài sẽ bị xóa. Sổ câu sai vẫn được giữ lại.',
+      body: 'Lịch sử, điểm cao nhất, tỉ lệ đúng và số câu đã luyện sẽ bị xóa. Sổ câu sai vẫn được giữ lại.',
       actions: [
         { label: 'Hủy', cls: 'btn-ghost' },
-        { label: 'Xóa lịch sử', cls: 'btn-primary', onClick: () => { store.remove(KEYS.history); store.remove(KEYS.stats); toast('Đã xóa lịch sử.', 'ok'); render(); } }
+        { label: 'Xóa lịch sử', cls: 'btn-primary', onClick: () => { store.remove(KEYS.history); store.remove(KEYS.stats); store.set(KEYS.seen, {}); toast('Đã xóa lịch sử.', 'ok'); render(); } }
       ]
     }),
     'resume': () => go('quiz'),
